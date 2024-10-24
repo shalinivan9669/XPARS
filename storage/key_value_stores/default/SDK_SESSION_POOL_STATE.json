@@ -1,0 +1,154 @@
+{
+  "usableSessionsCount": 4,
+  "retiredSessionsCount": 0,
+  "sessions": [
+    {
+      "id": "session_IR8ELiffzI",
+      "cookieJar": {
+        "version": "tough-cookie@5.0.0",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": []
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2024-10-24T17:19:45.255Z",
+      "createdAt": "2024-10-24T16:29:45.255Z",
+      "usageCount": 0,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    },
+    {
+      "id": "session_Ryue4ZdeU4",
+      "cookieJar": {
+        "version": "tough-cookie@5.0.0",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": [
+          {
+            "key": "gt",
+            "value": "1849488478288941423",
+            "expires": "2024-10-24T18:59:47.907Z",
+            "domain": "x.com",
+            "path": "/",
+            "secure": true,
+            "hostOnly": false,
+            "creation": "2024-10-24T16:30:14.470Z",
+            "lastAccessed": "2024-10-24T16:30:14.470Z"
+          },
+          {
+            "key": "night_mode",
+            "value": "2",
+            "expires": "2025-10-24T16:29:55.189Z",
+            "domain": "x.com",
+            "path": "/",
+            "secure": true,
+            "hostOnly": false,
+            "creation": "2024-10-24T16:30:14.471Z",
+            "lastAccessed": "2024-10-24T16:30:14.471Z"
+          },
+          {
+            "key": "guest_id",
+            "value": "172978738922587345",
+            "expires": "2025-10-24T16:29:47.493Z",
+            "domain": "x.com",
+            "path": "/",
+            "secure": true,
+            "hostOnly": false,
+            "creation": "2024-10-24T16:30:14.471Z",
+            "lastAccessed": "2024-10-24T16:30:14.471Z"
+          }
+        ]
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2024-10-24T17:19:45.260Z",
+      "createdAt": "2024-10-24T16:29:45.260Z",
+      "usageCount": 2,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    },
+    {
+      "id": "session_6mjB6xovBe",
+      "cookieJar": {
+        "version": "tough-cookie@5.0.0",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": []
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2024-10-24T17:20:29.575Z",
+      "createdAt": "2024-10-24T16:30:29.575Z",
+      "usageCount": 0,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    },
+    {
+      "id": "session_50MbXQcXXU",
+      "cookieJar": {
+        "version": "tough-cookie@5.0.0",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": [
+          {
+            "key": "gt",
+            "value": "1849488664071471604",
+            "expires": "2024-10-24T19:00:32.127Z",
+            "domain": "x.com",
+            "path": "/",
+            "secure": true,
+            "hostOnly": false,
+            "creation": "2024-10-24T16:30:46.483Z",
+            "lastAccessed": "2024-10-24T16:30:46.483Z"
+          },
+          {
+            "key": "night_mode",
+            "value": "2",
+            "expires": "2025-10-24T16:30:36.797Z",
+            "domain": "x.com",
+            "path": "/",
+            "secure": true,
+            "hostOnly": false,
+            "creation": "2024-10-24T16:30:46.484Z",
+            "lastAccessed": "2024-10-24T16:30:46.484Z"
+          },
+          {
+            "key": "guest_id",
+            "value": "172978743348906361",
+            "expires": "2025-10-24T16:30:31.769Z",
+            "domain": "x.com",
+            "path": "/",
+            "secure": true,
+            "hostOnly": false,
+            "creation": "2024-10-24T16:30:46.484Z",
+            "lastAccessed": "2024-10-24T16:30:46.484Z"
+          }
+        ]
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2024-10-24T17:20:29.578Z",
+      "createdAt": "2024-10-24T16:30:29.578Z",
+      "usageCount": 2,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    }
+  ]
+}
