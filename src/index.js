@@ -2,11 +2,39 @@ const { PuppeteerCrawler, Dataset, ProxyConfiguration } = require('crawlee');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const { GoogleSpreadsheet } = require('google-spreadsheet'); // Импортируем библиотеку
+const { JWT } = require('google-auth-library'); // Импортируем JWT из google-auth-library
 require('dotenv').config(); // Загружаем переменные из .env
+
+// Создание экземпляра JWT для аутентификации
+const auth = new JWT({
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Обработка переносов строк
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
+
+// Инициализация Google Spreadsheet без аутентификации
+const doc = new GoogleSpreadsheet('19K9brUB9nE46Ty-NVa3O2h5p8M-roLKLnqASm7nqqmw'); // Замените на ваш ID таблицы
+
+// Функция для авторизации и доступа к таблице
+async function accessSpreadsheet() {
+    try {
+        await auth.authorize(); // Авторизация
+        doc.authClient = auth; // Назначение auth клиента
+        await doc.loadInfo(); // Загрузка информации о документе
+        console.log(`Название таблицы: ${doc.title}`);
+
+        const sheet = doc.sheetsByIndex[0]; // Первый лист
+        return sheet;
+    } catch (error) {
+        console.error('Ошибка авторизации в Google Sheets:', error);
+        process.exit(1);
+    }
+}
 
 let proxyUrl = 'http://dx7rtz3bg2-corp-country-NL-hold-session-session-67181d788d22c:RwFdxeBi3IXFAAVR@93.190.142.57:9999';
 
-// Создаем экземпляр ProxyConfiguration
+// Создаём экземпляр ProxyConfiguration
 const proxyConfiguration = new ProxyConfiguration({
     proxyUrls: [proxyUrl],
 });
@@ -37,6 +65,9 @@ async function refreshProxy() {
         'https://x.com/silenthill',
         // Дополнительные URL могут быть добавлены сюда
     ];
+
+    // Получаем лист для записи данных
+    const sheet = await accessSpreadsheet();
 
     const crawler = new PuppeteerCrawler({
         // Используем proxyConfiguration
@@ -197,6 +228,8 @@ async function refreshProxy() {
             filteredPostsData.forEach(post => {
                 if (post.mediaUrl) {
                     log.info(`Пост: ${profileName}, mediaUrl: ${post.mediaUrl}`);
+                } else {
+                    log.warn(`Пост: ${profileName}, mediaUrl отсутствует.`);
                 }
             });
 
@@ -207,6 +240,28 @@ async function refreshProxy() {
                 trafficMB: (totalBytes / (1024 * 1024)).toFixed(2), // Добавляем потребленный трафик в MB
             };
 
+            // Запись данных в Google Sheets
+            const row = {
+                Profile: dataToSave.profile,
+                ParsingDate: dataToSave.parsingDate,
+                TrafficMB: dataToSave.trafficMB,
+            };
+
+            // Динамическое добавление постов
+            dataToSave.posts.forEach((post, index) => {
+                row[`Post${index + 1}_Date`] = post.date;
+                row[`Post${index + 1}_Text`] = post.text;
+                row[`Post${index + 1}_MediaUrl`] = post.mediaUrl;
+                row[`Post${index + 1}_Comments`] = post.comments;
+                row[`Post${index + 1}_Shares`] = post.shares;
+                row[`Post${index + 1}_Likes`] = post.likes;
+            });
+
+            sheet.addRow(row).catch(error => {
+                log.error(`Ошибка при добавлении строки в Google Sheets: ${error.message}`);
+            });
+
+            // Также сохраняем данные в Crawlee Dataset
             await Dataset.pushData(dataToSave);
 
             log.info(`Найдено ${filteredPostsData.length} постов для профиля ${profileName}`);
