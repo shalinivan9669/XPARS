@@ -43,10 +43,11 @@ async function refreshProxy() {
         proxyConfiguration,
         launchContext: {
             launchOptions: {
-                headless: false,
+                headless: true, // Используем headless режим для экономии ресурсов
                 args: [
                     '--no-sandbox',
-                    '--disable-setuid-sandbox'
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage', // Дополнительные флаги для стабильности
                 ],
             },
         },
@@ -59,6 +60,73 @@ async function refreshProxy() {
             const requiredPosts = 5;
             let retries = 0;
             const maxRetries = 3;
+
+            // Переменная для отслеживания потребленного трафика
+            let totalBytes = 0;
+
+            // Настройка мобильного режима
+            const mobileUserAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) ' +
+                'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15A372 Safari/604.1';
+            await page.setUserAgent(mobileUserAgent);
+            await page.setViewport({
+                width: 375,
+                height: 667,
+                isMobile: true,
+                hasTouch: true,
+            });
+
+            // Включаем перехват запросов
+            await page.setRequestInterception(true);
+
+            // Минимальный прозрачный пиксель (1x1 PNG)
+            const transparentPixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIW2NkYGBgAAAABQABDQottAAAAABJRU5ErkJggg==';
+
+            // Обработка запросов для блокировки ненужных ресурсов и доменов
+            const blockedDomains = ['example.com', 'anotherdomain.com']; // Добавьте необходимые домены
+            page.on('request', (req) => {
+                const url = req.url();
+                const resourceType = req.resourceType();
+
+                if (blockedDomains.some(domain => url.includes(domain))) {
+                    req.abort();
+                    return;
+                }
+
+                if (['stylesheet', 'font', 'media'].includes(resourceType)) {
+                    req.abort();
+                    return;
+                }
+
+                if (resourceType === 'image') {
+                    // Отвечаем с минимальным прозрачным изображением для экономии трафика
+                    req.respond({
+                        status: 200,
+                        contentType: 'image/png',
+                        body: Buffer.from(transparentPixel.split(',')[1], 'base64'),
+                    });
+                    return;
+                }
+
+                req.continue();
+            });
+
+            // Обработка ответов для подсчета потребленного трафика
+            page.on('response', async (response) => {
+                try {
+                    const headers = response.headers();
+                    let length = 0;
+                    if (headers['content-length']) {
+                        length = parseInt(headers['content-length'], 10);
+                    } else {
+                        // Если content-length отсутствует, нужно получить размер буфера
+                        const buffer = await response.buffer();
+                        length = buffer.length;
+                    }
+                    totalBytes += length;
+                } catch (err) {
+                    // Некоторые ответы могут не иметь тела (например, 204 No Content)
+                }
+            });
 
             while (loadedPostsCount < requiredPosts && retries < maxRetries) {
                 await page.evaluate(() => {
@@ -90,12 +158,13 @@ async function refreshProxy() {
                         const text = textElement ? textElement.innerText : null;
 
                         let mediaUrl = null;
-                        const imageElement = div.querySelector('[data-testid="tweetPhoto"] img');
+                        // Корректируем селектор для изображения
+                        const imageElement = div.querySelector('img[data-testid="tweetPhoto"]') || div.querySelector('img[src*="media"]');
                         const videoElement = div.querySelector('video source');
 
-                        if (videoElement) {
+                        if (videoElement && videoElement.src) {
                             mediaUrl = videoElement.src;
-                        } else if (imageElement) {
+                        } else if (imageElement && imageElement.src && imageElement.src !== 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIW2NkYGBgAAAABQABDQottAAAAABJRU5ErkJggg==') {
                             mediaUrl = imageElement.src;
                         }
 
@@ -116,15 +185,32 @@ async function refreshProxy() {
                 requiredPosts
             );
 
+            // Фильтрация пустых mediaUrl
+            const filteredPostsData = postsData.map(post => {
+                if (post.mediaUrl && !post.mediaUrl.startsWith('data:image')) {
+                    return post;
+                }
+                return { ...post, mediaUrl: null };
+            });
+
+            // Логирование извлеченных mediaUrl для отладки (опционально)
+            filteredPostsData.forEach(post => {
+                if (post.mediaUrl) {
+                    log.info(`Пост: ${profileName}, mediaUrl: ${post.mediaUrl}`);
+                }
+            });
+
             const dataToSave = {
                 profile: profileName,
                 parsingDate: new Date().toISOString(),
-                posts: postsData
+                posts: filteredPostsData,
+                trafficMB: (totalBytes / (1024 * 1024)).toFixed(2), // Добавляем потребленный трафик в MB
             };
 
             await Dataset.pushData(dataToSave);
 
-            log.info(`Найдено ${postsData.length} постов для профиля ${profileName}`);
+            log.info(`Найдено ${filteredPostsData.length} постов для профиля ${profileName}`);
+            log.info(`Потреблено трафика: ${dataToSave.trafficMB} MB для профиля ${profileName}`);
             await page.close();
 
             // Задержка перед следующим запросом
