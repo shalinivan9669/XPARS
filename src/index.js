@@ -1,61 +1,35 @@
-const { PuppeteerCrawler, Dataset, ProxyConfiguration } = require('crawlee');
-const axios = require('axios');
+const { PuppeteerCrawler, Dataset } = require('crawlee');
 const fs = require('fs');
 const path = require('path');
-const { GoogleSpreadsheet } = require('google-spreadsheet'); // Импортируем библиотеку
-const { JWT } = require('google-auth-library'); // Импортируем JWT из google-auth-library
-require('dotenv').config(); // Загружаем переменные из .env
+const { GoogleSpreadsheet } = require('google-spreadsheet');
+const { JWT } = require('google-auth-library');
+require('dotenv').config();
+
+// Логи для проверки переменных окружения
+console.log('Service Account Email:', process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
+console.log('Private Key:', process.env.GOOGLE_PRIVATE_KEY ? 'Loaded' : 'Not Loaded');
 
 // Создание экземпляра JWT для аутентификации
 const auth = new JWT({
     email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Обработка переносов строк
+    key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
-// Инициализация Google Spreadsheet без аутентификации
-const doc = new GoogleSpreadsheet('19K9brUB9nE46Ty-NVa3O2h5p8M-roLKLnqASm7nqqmw'); // Замените на ваш ID таблицы
+// Инициализация Google Spreadsheet с передачей auth
+const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID, auth);
 
-// Функция для авторизации и доступа к таблице
+// Функция для доступа к таблице
 async function accessSpreadsheet() {
     try {
-        await auth.authorize(); // Авторизация
-        doc.authClient = auth; // Назначение auth клиента
         await doc.loadInfo(); // Загрузка информации о документе
         console.log(`Название таблицы: ${doc.title}`);
 
         const sheet = doc.sheetsByIndex[0]; // Первый лист
         return sheet;
     } catch (error) {
-        console.error('Ошибка авторизации в Google Sheets:', error);
+        console.error('Ошибка при доступе к Google Sheets:', error);
         process.exit(1);
-    }
-}
-
-let proxyUrl = 'http://dx7rtz3bg2-corp-country-NL-hold-session-session-67181d788d22c:RwFdxeBi3IXFAAVR@93.190.142.57:9999';
-
-// Создаём экземпляр ProxyConfiguration
-const proxyConfiguration = new ProxyConfiguration({
-    proxyUrls: [proxyUrl],
-});
-
-// Функция для обновления IP прокси
-async function refreshProxy() {
-    try {
-        const apiKey = process.env.API_KEY;
-        const response = await axios.get(`https://api.asocks.com/v2/proxy/refresh/65999495?apiKey=${apiKey}`);
-        if (response.status === 200) {
-            console.log('IP прокси успешно обновлен.');
-            // Если после обновления прокси URL изменяется, обновите proxyUrl здесь
-            // proxyUrl = обновленный_прокси_URL;
-
-            // Обновляем proxyUrls в proxyConfiguration
-            proxyConfiguration.proxyUrls = [proxyUrl];
-            return true;
-        }
-    } catch (error) {
-        console.error('Не удалось обновить IP прокси:', error.message);
-        return false;
     }
 }
 
@@ -69,22 +43,28 @@ async function refreshProxy() {
     // Получаем лист для записи данных
     const sheet = await accessSpreadsheet();
 
+    // Загружаем заголовки (если необходимо)
+    try {
+        await sheet.loadHeaderRow();
+    } catch (error) {
+        console.error('Ошибка при загрузке заголовков:', error.message);
+    }
+
     const crawler = new PuppeteerCrawler({
-        // Используем proxyConfiguration
-        proxyConfiguration,
         launchContext: {
             launchOptions: {
-                headless: true, // Используем headless режим для экономии ресурсов
+                headless: true,
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage', // Дополнительные флаги для стабильности
+                    '--disable-dev-shm-usage',
                 ],
             },
         },
-        maxConcurrency: 1, // Устанавливаем последовательный парсинг (1 поток)
-        async requestHandler({ page, request, log, proxyInfo }) {
-            log.info(`Обработка ${request.url} с использованием прокси ${proxyInfo.url}...`);
+        maxConcurrency: 1,
+        maxRequestRetries: 0, // Устанавливаем количество повторных попыток в 0
+        async requestHandler({ page, request, log }) {
+            log.info(`Обработка ${request.url}...`);
 
             const profileName = request.url.split('/').pop();
             let loadedPostsCount = 0;
@@ -189,7 +169,6 @@ async function refreshProxy() {
                         const text = textElement ? textElement.innerText : null;
 
                         let mediaUrl = null;
-                        // Корректируем селектор для изображения
                         const imageElement = div.querySelector('img[data-testid="tweetPhoto"]') || div.querySelector('img[src*="media"]');
                         const videoElement = div.querySelector('video source');
 
@@ -229,7 +208,7 @@ async function refreshProxy() {
                 if (post.mediaUrl) {
                     log.info(`Пост: ${profileName}, mediaUrl: ${post.mediaUrl}`);
                 } else {
-                    log.warn(`Пост: ${profileName}, mediaUrl отсутствует.`);
+                    log.warning(`Пост: ${profileName}, mediaUrl отсутствует.`);
                 }
             });
 
@@ -241,25 +220,26 @@ async function refreshProxy() {
             };
 
             // Запись данных в Google Sheets
-            const row = {
-                Profile: dataToSave.profile,
-                ParsingDate: dataToSave.parsingDate,
-                TrafficMB: dataToSave.trafficMB,
-            };
-
-            // Динамическое добавление постов
-            dataToSave.posts.forEach((post, index) => {
-                row[`Post${index + 1}_Date`] = post.date;
-                row[`Post${index + 1}_Text`] = post.text;
-                row[`Post${index + 1}_MediaUrl`] = post.mediaUrl;
-                row[`Post${index + 1}_Comments`] = post.comments;
-                row[`Post${index + 1}_Shares`] = post.shares;
-                row[`Post${index + 1}_Likes`] = post.likes;
-            });
-
-            sheet.addRow(row).catch(error => {
+            try {
+                for (const post of dataToSave.posts) {
+                    const row = {
+                        ParsDate: new Date().toISOString(),
+                        Profile: dataToSave.profile,
+                        ParsingDate: dataToSave.parsingDate,
+                        TrafficMB: dataToSave.trafficMB,
+                        PostDate: post.date,
+                        PostText: post.text,
+                        MediaUrl: post.mediaUrl,
+                        Comments: post.comments,
+                        Shares: post.shares,
+                        Likes: post.likes,
+                    };
+                    await sheet.addRow(row);
+                }
+                log.info(`Данные успешно добавлены в Google Sheets для профиля ${profileName}`);
+            } catch (error) {
                 log.error(`Ошибка при добавлении строки в Google Sheets: ${error.message}`);
-            });
+            }
 
             // Также сохраняем данные в Crawlee Dataset
             await Dataset.pushData(dataToSave);
@@ -270,19 +250,6 @@ async function refreshProxy() {
 
             // Задержка перед следующим запросом
             await new Promise(resolve => setTimeout(resolve, 5000)); // Задержка 5 секунд
-        },
-        failedRequestHandler: async ({ request, log }) => {
-            log.error(`Запрос ${request.url} завершился неудачей. Пытаемся обновить IP прокси...`);
-
-            // Обновление IP прокси
-            if (await refreshProxy()) {
-                log.info('Прокси успешно обновлен. Продолжаем парсинг...');
-                // Обновляем proxyUrls в proxyConfiguration
-                proxyConfiguration.proxyUrls = [proxyUrl];
-            } else {
-                log.error('Не удалось обновить прокси. Завершаем выполнение.');
-                process.exit(1); // Завершаем выполнение скрипта при неудаче
-            }
         },
     });
 
